@@ -40,3 +40,34 @@ export const sendOTPEmail = async (email: string, otp: string): Promise<void> =>
     throw new Error(error.message);
   }
 };
+
+export const sendPasswordResetEmail = async (
+  email: string,
+  resetToken: string,
+  frontendUrl: string,
+) => {
+  const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+  await resend.emails.send({
+    from: 'UniIntern <noreply@uniintern.com>',
+    to: email,
+    subject: 'Reset Your UniIntern Password',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: #1a2b4a; padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+          <h1 style="color: white; margin: 0;">UniIntern</h1>
+        </div>
+        <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 12px 12px;">
+          <h2 style="color: #1a2b4a;">Reset Your Password</h2>
+          <p style="color: #666;">You requested a password reset. Click the button below to set a new password.</p>
+          <a href="${resetUrl}" 
+             style="display: inline-block; background: #00c896; color: white; padding: 12px 30px; border-radius: 8px; text-decoration: none; font-weight: bold; margin: 20px 0;">
+            Reset Password
+          </a>
+          <p style="color: #999; font-size: 12px;">This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+          <p style="color: #999; font-size: 12px;">Or copy this link: ${resetUrl}</p>
+        </div>
+      </div>
+    `,
+  });
+};

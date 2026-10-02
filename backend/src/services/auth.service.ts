@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import { Role } from '@prisma/client';
 import { prisma } from '../config/db';
 import { signToken } from '../utils/jwt';
+import crypto from 'crypto';
+
 
 interface RegisterInput {
   email: string;
@@ -180,4 +182,48 @@ export const updateCompanyProfile = async (input: UpdateCompanyProfileInput) => 
   });
 
   return user;
+};
+
+
+export const forgotPassword = async (email: string) => {
+  const user = await prisma.user.findUnique({
+    where: { email: email.trim().toLowerCase() },
+  });
+
+  if (!user) throw new Error('No account found with this email.');
+
+  // Generate reset token
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { resetToken, resetTokenExpiry },
+  });
+
+  return { resetToken, email: user.email };
+};
+
+export const resetPassword = async (token: string, newPassword: string) => {
+  const user = await prisma.user.findFirst({
+    where: {
+      resetToken: token,
+      resetTokenExpiry: { gt: new Date() },
+    },
+  });
+
+  if (!user) throw new Error('Invalid or expired reset token.');
+
+  const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashedPassword,
+      resetToken: null,
+      resetTokenExpiry: null,
+    },
+  });
+
+  return { email: user.email };
 };

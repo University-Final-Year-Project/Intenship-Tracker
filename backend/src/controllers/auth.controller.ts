@@ -1,6 +1,15 @@
 import { Request, Response } from 'express';
-import { registerUser, loginUser, getMe, updateStudentProfile, updateCompanyProfile } from '../services/auth.service';
+import {
+  registerUser,
+  loginUser,
+  getMe,
+  updateStudentProfile,
+  updateCompanyProfile,
+  forgotPassword,
+  resetPassword,
+} from '../services/auth.service';
 import { sendSuccess, sendCreated, sendError } from '../utils/responseHelper';
+
 
 import { Role } from '@prisma/client';
 
@@ -184,5 +193,45 @@ export const clearMatchScoreCache = async (req: Request, res: Response): Promise
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to clear cache.';
     sendError(res, message, 500);
+  }
+};
+
+export const forgotPasswordHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      sendError(res, 'Email is required.', 400);
+      return;
+    }
+
+    const { resetToken, email: userEmail } = await forgotPassword(email);
+    
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:5173';
+    const resetUrl = `${frontendUrl}/reset-password?token=${resetToken}`;
+
+    sendSuccess(res, { resetUrl }, 'Password reset link generated. Email sending coming soon.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to send reset email.';
+    sendError(res, message, 400);
+  }
+};
+
+export const resetPasswordHandler = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      sendError(res, 'Token and password are required.', 400);
+      return;
+    }
+    if (password.length < 6) {
+      sendError(res, 'Password must be at least 6 characters.', 400);
+      return;
+    }
+
+    await resetPassword(token, password);
+    sendSuccess(res, null, 'Password reset successfully. You can now login.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to reset password.';
+    sendError(res, message, 400);
   }
 };
