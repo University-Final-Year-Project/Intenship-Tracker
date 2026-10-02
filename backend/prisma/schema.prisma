@@ -59,6 +59,9 @@ model User {
   applications   Application[]
   documents      Document[]
 
+  resetToken         String?
+  resetTokenExpiry   DateTime?
+
   @@map("users")
 }
 
