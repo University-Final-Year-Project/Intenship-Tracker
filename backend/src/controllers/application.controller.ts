@@ -4,6 +4,7 @@ import {
   getStudentApplications,
   getApplicationById,
   getJobApplications,
+  getApplicantDetail,
   updateApplicationStatus,
 } from '../services/application.service';
 import {
@@ -45,25 +46,53 @@ export const fetchStudentApplications = async (req: Request, res: Response): Pro
   }
 };
 
+// Turns the service errors into the right HTTP codes.
+const sendApplicationError = (res: Response, error: unknown, fallback: string, code = 500): void => {
+  if (error instanceof NotFoundError) {
+    sendError(res, error.message, 404);
+    return;
+  }
+  if (error instanceof ForbiddenError) {
+    sendError(res, error.message, 403);
+    return;
+  }
+  sendError(res, error instanceof Error ? error.message : fallback, code);
+};
+
 export const fetchApplicationById = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const application = await getApplicationById(Array.isArray(id) ? id[0] : id);
+    const application = await getApplicationById(Array.isArray(id) ? id[0] : id, {
+      userId: req.user!.userId,
+      role: req.user!.role,
+    });
     sendSuccess(res, application, 'Application fetched successfully.');
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch application.';
-    sendError(res, message, 404);
+    sendApplicationError(res, error, 'Failed to fetch application.');
   }
 };
 
 export const fetchJobApplications = async (req: Request, res: Response): Promise<void> => {
   try {
     const { jobId } = req.params;
-    const applications = await getJobApplications(Array.isArray(jobId) ? jobId[0] : jobId);
+    const applications = await getJobApplications(
+      Array.isArray(jobId) ? jobId[0] : jobId,
+      req.user!.userId,
+    );
     sendSuccess(res, applications, 'Applications fetched successfully.');
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch applications.';
-    sendError(res, message, 500);
+    sendApplicationError(res, error, 'Failed to fetch applications.');
+  }
+};
+
+// One applicant in full: profile, email, cover note, CV and letter.
+export const fetchApplicantDetail = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const detail = await getApplicantDetail(Array.isArray(id) ? id[0] : id, req.user!.userId);
+    sendSuccess(res, detail, 'Applicant fetched successfully.');
+  } catch (error) {
+    sendApplicationError(res, error, 'Failed to fetch applicant.');
   }
 };
 
@@ -104,11 +133,11 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
     const application = await updateApplicationStatus(
       Array.isArray(id) ? id[0] : id,
       status,
+      req.user!.userId,
     );
 
     sendSuccess(res, application, 'Application status updated successfully.');
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update status.';
-    sendError(res, message, 400);
+    sendApplicationError(res, error, 'Failed to update status.', 400);
   }
 };
