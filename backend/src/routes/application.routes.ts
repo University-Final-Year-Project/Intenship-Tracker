@@ -4,6 +4,7 @@ import {
   fetchStudentApplications,
   fetchApplicationById,
   fetchJobApplications,
+  fetchApplicantScores,
   updateStatus,
 } from '../controllers/application.controller';
 import { protect } from '../middleware/auth.middleware';
@@ -18,6 +19,7 @@ router.get('/:id', protect, fetchApplicationById);
 
 // Company routes
 router.get('/job/:jobId', protect, restrictTo('COMPANY'), fetchJobApplications);
+router.get('/job/:jobId/scores', protect, restrictTo('COMPANY'), fetchApplicantScores);
 router.patch('/:id/status', protect, restrictTo('COMPANY'), updateStatus);
 
 export default router;

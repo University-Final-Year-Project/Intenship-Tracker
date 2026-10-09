@@ -194,6 +194,11 @@ model MatchScore {
   jobId     String
   score     Int
   reason    String
+  // AI when Gemini produced the score, FALLBACK when the skills overlap rule did
+  source    String   @default("AI")
+  // Fingerprint of the student and job details the score was based on.
+  // When either changes, the stored score is out of date and is recalculated.
+  inputHash String   @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

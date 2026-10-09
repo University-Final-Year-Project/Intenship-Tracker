@@ -8,7 +8,12 @@ import {
   toggleJobPosting,
   updateJob,
 } from '../services/job.service';
-import { calculateMatchScore } from '../services/ai.service';
+import {
+  getMatchScore,
+  getMatchScoresForStudent,
+  NotFoundError,
+  MAX_BATCH,
+} from '../services/matchScore.service';
 import { sendSuccess, sendCreated, sendError } from '../utils/responseHelper';
 
 export const postJob = async (req: Request, res: Response): Promise<void> => {
@@ -122,28 +127,37 @@ export const fetchCompanyPublicProfile = async (req: Request, res: Response): Pr
 export const getJobMatchScore = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const userId = req.user!.userId;
-
-    const job = await getJobById(Array.isArray(id) ? id[0] : id);
-
-    const { prisma } = await import('../config/db');
-    const studentProfile = await prisma.studentProfile.findUnique({
-      where: { userId },
-    });
-
-    const { score, reason } = await calculateMatchScore(
-      userId,
-      studentProfile?.skills ?? [],
-      (studentProfile as any)?.courseOfStudy ?? null,
-      job.id,
-      job.skillsRequired,
-      job.title,
-      job.description,
-    );
-
-    sendSuccess(res, { score, reason }, 'Match score calculated.');
+    const result = await getMatchScore(req.user!.userId, Array.isArray(id) ? id[0] : id);
+    sendSuccess(res, result, 'Match score calculated.');
   } catch (error) {
+    if (error instanceof NotFoundError) {
+      sendError(res, error.message, 404);
+      return;
+    }
     const message = error instanceof Error ? error.message : 'Failed to calculate match score.';
+    sendError(res, message, 500);
+  }
+};
+
+// Scores for several jobs in one request, so list screens show the same numbers as the job page.
+export const getJobMatchScores = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { jobIds } = req.body ?? {};
+
+    if (
+      !Array.isArray(jobIds) ||
+      jobIds.length === 0 ||
+      jobIds.length > MAX_BATCH ||
+      !jobIds.every((id) => typeof id === 'string' && id.length > 0)
+    ) {
+      sendError(res, `jobIds must be a list of 1 to ${MAX_BATCH} job ids.`, 400);
+      return;
+    }
+
+    const scores = await getMatchScoresForStudent(req.user!.userId, jobIds);
+    sendSuccess(res, { scores }, 'Match scores calculated.');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to calculate match scores.';
     sendError(res, message, 500);
   }
 };
